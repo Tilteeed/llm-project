@@ -1,0 +1,2 @@
+llm_stack_dir: /opt/stack/llm
+monitoring_stack_dir: /opt/stack/monitoring

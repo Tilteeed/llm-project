@@ -1,0 +1,27 @@
+- name: Install Docker packages (Ubuntu repo)
+  ansible.builtin.apt:
+    name:
+      - docker.io
+      - docker-compose-v2
+    state: present
+
+- name: Enable and start Docker
+  ansible.builtin.systemd:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Add user to docker group
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    groups: docker
+    append: true
+
+- name: Show Docker version
+  ansible.builtin.command: docker version
+  register: docker_version
+  changed_when: false
+
+- name: Print Docker version
+  ansible.builtin.debug:
+    var: docker_version.stdout_lines

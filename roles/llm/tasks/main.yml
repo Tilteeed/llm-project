@@ -1,0 +1,25 @@
+- name: Create LLM stack directory
+  ansible.builtin.file:
+    path: "{{ llm_stack_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy Ollama docker-compose.yml
+  ansible.builtin.copy:
+    src: docker-compose.yml
+    dest: "{{ llm_stack_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Start Ollama stack
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ llm_stack_dir }}"
+
+- name: Show running containers
+  ansible.builtin.command: docker ps
+  register: ps
+  changed_when: false
+
+- name: Print docker ps
+  ansible.builtin.debug:
+    var: ps.stdout_lines

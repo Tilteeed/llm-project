@@ -1,0 +1,42 @@
+- name: Create monitoring stack directory
+  ansible.builtin.file:
+    path: "{{ monitoring_stack_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Copy monitoring docker-compose.yml
+  ansible.builtin.copy:
+    src: docker-compose.yml
+    dest: "{{ monitoring_stack_dir }}/docker-compose.yml"
+    mode: "0644"
+
+- name: Copy prometheus config
+  ansible.builtin.copy:
+    src: prometheus.yml
+    dest: "{{ monitoring_stack_dir }}/prometheus.yml"
+    mode: "0644"
+
+- name: Remove wrong nested grafana directory if exists
+  ansible.builtin.file:
+    path: "{{ monitoring_stack_dir }}/grafana/grafana"
+    state: absent
+
+- name: Copy Grafana provisioning and dashboards
+  ansible.builtin.copy:
+    src: grafana/
+    dest: "{{ monitoring_stack_dir }}/grafana"
+    mode: "0755"
+
+- name: Start monitoring stack
+  ansible.builtin.command: docker compose up -d
+  args:
+    chdir: "{{ monitoring_stack_dir }}"
+
+- name: Show running containers
+  ansible.builtin.command: docker ps
+  register: ps
+  changed_when: false
+
+- name: Print docker ps
+  ansible.builtin.debug:
+    var: ps.stdout_lines
