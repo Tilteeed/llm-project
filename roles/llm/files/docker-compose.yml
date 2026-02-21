@@ -6,6 +6,7 @@ services:
       - "11434:11434"
     volumes:
       - ollama:/root/.ollama
+    gpus: all
     restart: unless-stopped
 
 volumes:

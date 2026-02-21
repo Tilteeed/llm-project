@@ -4,5 +4,6 @@
   roles:
     - { role: common, tags: ["common"] }
     - { role: docker, tags: ["docker"] }
+    - { role: gpu, tags: ["gpu"] }
     - { role: llm, tags: ["llm"] }
     - { role: monitoring, tags: ["monitoring"] }
