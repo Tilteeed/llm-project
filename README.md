@@ -1,170 +1,196 @@
-🚀 LLM Infrastructure as Code (Ansible + Docker)
+# 📦 LLM Infrastructure as Code (Ansible + Docker)
 
-Production-style IaC проект для автоматического развертывания:
+Проект автоматизирует развёртывание сервера для работы с LLM-моделями (Ollama) и мониторинга (Prometheus + Grafana) с использованием Ansible.
 
-🤖 Ollama (LLM сервер)
+Поддерживается:
 
-📊 Prometheus
+- Ubuntu 24.04
+    
+- Docker
+    
+- Ollama
+    
+- Prometheus
+    
+- Grafana
+    
+- Node Exporter
+    
 
-📈 Grafana
+---
 
-🖥 Node Exporter
+# 🏗 Архитектура
 
-🐳 Docker Engine
+Проект реализован по принципу Infrastructure as Code:
 
-Полностью воспроизводимый стек через Ansible.
+- Ansible управляет конфигурацией серверов
+    
+- Docker Compose запускает сервисы
+    
+- Вся конфигурация хранится в Git
+    
+- Развёртывание полностью воспроизводимо
+    
 
-🏗 Архитектура
+---
 
-Control Node:
-
-Debian / Linux машина
-
-Ansible установлен
-
-Управляет серверами по SSH
-
-Target Node:
-
-Ubuntu Server 24.04
-
-Чистая система (достаточно SSH и Python3)
-
-Настраивается автоматически
-
-📂 Структура проекта
+# 📁 Структура проекта
+```Структура
 llm-iac/
+├── ansible.cfg
 ├── group_vars/
-│   └── llm_nodes.yml        # Переменные для группы llm_nodes
+│   └── llm_nodes.yml
 ├── inventory/
-│   └── hosts.ini            # Список управляемых серверов
+│   └── hosts.ini
 ├── roles/
-│   ├── common/              # Базовая настройка системы
-│   ├── docker/              # Установка Docker
-│   ├── llm/                 # Развертывание Ollama
-│   └── monitoring/          # Prometheus + Grafana + Node Exporter
-├── site.yml                 # Главный playbook
+│   ├── common/
+│   ├── docker/
+│   ├── llm/
+│   └── monitoring/
+├── site.yml
 └── README.md
-⚙️ Что делает каждая роль
-common
+```
+## 🔹 ansible.cfg
 
-apt update
+Глобальная конфигурация Ansible:
 
-apt upgrade
+- inventory по умолчанию
+    
+- отключение host_key_checking
+    
+- become через sudo
+    
+- auto python interpreter detection
+    
 
-установка базовых пакетов
+## 🔹 inventory/hosts.ini
 
-docker
-
-установка Docker Engine
-
-запуск сервиса
-
-добавление пользователя в docker group
-
-llm
-
-копирование docker-compose.yml
-
-запуск Ollama
-
-публикация API на порт 11434
-
-monitoring
-
-Prometheus (9090)
-
-Node Exporter
-
-Grafana (3000)
-
-Автоматическое provisioning:
-
-Datasource Prometheus
-
-Дашборд Node Exporter
-
-📋 Требования
-
-На control node:
-
-sudo apt install ansible git
-
-SSH доступ к target node:
-
-ssh user@server_ip
-
-Python3 должен быть установлен на target (обычно уже есть).
-
-🖥 Настройка inventory
-
-Файл:
-
-inventory/hosts.ini
+Список управляемых серверов.
 
 Пример:
 
-[llm_nodes]
-server1 ansible_host=192.168.56.101 ansible_user=alex
+```
+[llm_nodes]  
+ubuntu_vm ansible_host=192.168.56.106 ansible_user=alex
+```
 
-Можно добавить несколько серверов:
+## 🔹 group_vars/llm_nodes.yml
 
-[llm_nodes]
-server1 ansible_host=192.168.56.101 ansible_user=alex
-server2 ansible_host=192.168.56.105 ansible_user=alex
-🔧 Переменные
+Переменные для группы серверов LLM.
 
-Файл:
+## 🔹 roles/
 
-group_vars/llm_nodes.yml
+### common
 
-Пример:
+- обновление системы
+    
+- установка базовых пакетов
+    
 
-llm_stack_dir: /opt/stack/llm
-monitoring_stack_dir: /opt/stack/monitoring
+### docker
 
-Можно расширять:
+- установка Docker
+    
+- запуск и включение сервиса
+    
+- добавление пользователя в группу docker
+    
 
-версии образов
+### llm
 
-порты
+- развёртывание Ollama
+    
+- запуск контейнера
+    
+- проброс порта 11434
+    
 
-пароли
+### monitoring
 
-🚀 Развертывание
-Полная установка
-ansible-playbook -i inventory/hosts.ini site.yml --ask-become-pass
-Запуск только определенной роли
+- Prometheus
+    
+- Grafana
+    
+- Node Exporter
+    
+- автоматический provisioning datasource
+    
+- автоматическая загрузка dashboard
+    
 
-Только Docker:
+---
 
-ansible-playbook -i inventory/hosts.ini site.yml --ask-become-pass --tags docker
+# 🚀 Развёртывание
 
-Только LLM:
+## 1️⃣ Проверка соединения
 
-ansible-playbook -i inventory/hosts.ini site.yml --ask-become-pass --tags llm
+```
+ansible all -m ping
+```
 
-Только мониторинг:
+## 2️⃣ Полный деплой
 
-ansible-playbook -i inventory/hosts.ini site.yml --ask-become-pass --tags monitoring
-🔍 Проверка после установки
-Ollama API
-http://server_ip:11434
+```
+ansible-playbook site.yml
+```
 
-Проверка:
+---
 
-curl http://server_ip:11434/api/tags
-Prometheus
-http://server_ip:9090
-Grafana
-http://server_ip:3000
+# 📊 После развёртывания
 
-Default credentials (если не изменены):
+|Сервис|URL|
+|---|---|
+|Ollama API|http://SERVER_IP:11434|
+|Prometheus|http://SERVER_IP:9090|
+|Grafana|http://SERVER_IP:3000|
 
-admin / admin
+---
 
-Дашборд:
+# 🧠 Проверка Ollama
 
-Folder: Infra
+```
+curl http://SERVER_IP:11434/api/tags
+```
 
-Dashboard: Node Exporter Full
+Если модели не загружены:
+
+```
+{"models":[]}
+```
+
+Это нормальное поведение.
+
+---
+
+# 📈 Проверка Prometheus
+
+```
+curl http://SERVER_IP:9090/-/ready
+```
+
+---
+
+# 📊 Grafana
+
+По умолчанию:
+
+- Логин: admin
+    
+- Пароль: admin (меняется при первом входе)
+    
+
+Dashboard Node Exporter загружается автоматически через provisioning.
+
+---
+
+# 🔁 Повторный запуск
+
+Проект идемпотентен.
+
+Повторный запуск:
+
+```
+ansible-playbook site.yml
+```
+
+Не приводит к повторной установке уже настроенных компонентов.
