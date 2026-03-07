@@ -1,0 +1,176 @@
+---
+# 1) PRECHECK GPU (до любых установок)
+
+- name: "WSL GPU | precheck nvidia-smi (must print NVIDIA table)"
+  ansible.builtin.shell: |
+    set -o pipefail
+    if command -v nvidia-smi >/dev/null 2>&1; then
+      nvidia-smi
+    elif [ -x /usr/lib/wsl/lib/nvidia-smi ]; then
+      /usr/lib/wsl/lib/nvidia-smi
+    else
+      exit 127
+    fi
+  args:
+    executable: /bin/bash
+  register: wsl_nvidia_smi_pre
+  changed_when: false
+  failed_when: false
+
+- name: "WSL GPU | show nvidia-smi output (precheck)"
+  ansible.builtin.debug:
+    var: wsl_nvidia_smi_pre.stdout_lines
+  when: wsl_nvidia_smi_pre.rc == 0
+
+- name: "WSL GPU | set fact gpu_present"
+  ansible.builtin.set_fact:
+    wsl_gpu_present: "{{ wsl_nvidia_smi_pre.rc == 0 }}"
+  changed_when: false
+
+- name: "WSL GPU | FAIL if GPU missing"
+  ansible.builtin.fail:
+    msg: "GPU not detected in WSL (nvidia-smi rc={{ wsl_nvidia_smi_pre.rc }}). Aborting role."
+  when:
+    - not wsl_gpu_present
+    - (wsl_gpu_missing_action | default('fail')) == "fail"
+
+- name: "WSL GPU | SKIP ALL install if GPU missing"
+  ansible.builtin.debug:
+    msg: "WARNING: GPU not detected in WSL (nvidia-smi rc={{ wsl_nvidia_smi_pre.rc }}). Skipping ALL tasks in role."
+  when:
+    - not wsl_gpu_present
+    - (wsl_gpu_missing_action | default('fail')) == "skip"
+
+
+# 2) ВСЯ УСТАНОВКА — ТОЛЬКО ЕСЛИ GPU ЕСТЬ
+
+- name: "WSL GPU | install & configure (only if GPU present)"
+  when: wsl_gpu_present
+  block:
+
+    - name: "Init | set restart flag"
+      ansible.builtin.set_fact:
+        ollama_restart_needed: false
+      changed_when: false
+
+    # --- Ollama install (твой порядок)
+
+    - name: "Ollama | apt update"
+      become: true
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: "Ollama | install zstd"
+      become: true
+      ansible.builtin.apt:
+        name: zstd
+        state: present
+
+    - name: "Ollama | install (curl -fsSL https://ollama.com/install.sh | sh)"
+      become: true
+      ansible.builtin.shell: |
+        set -e
+        curl -fsSL https://ollama.com/install.sh | sh
+      args:
+        executable: /bin/bash
+        creates: /usr/local/bin/ollama
+      register: ollama_install
+      changed_when: ollama_install.rc == 0
+
+    - name: "Ollama | mark restart needed if installed"
+      ansible.builtin.set_fact:
+        ollama_restart_needed: "{{ ollama_restart_needed or (ollama_install is changed) }}"
+      changed_when: false
+
+    # --- CUDA toolkit (как ты просил)
+
+    - name: "CUDA | install nvidia-cuda-toolkit"
+      become: true
+      ansible.builtin.apt:
+        name: nvidia-cuda-toolkit
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+      when: (wsl_install_cuda_toolkit | default(true)) | bool
+
+    # --- bashrc exports (как у тебя, но без дублей)
+    - name: "WSL | ensure nvidia-smi available in PATH via symlink"
+      become: true
+      ansible.builtin.file:
+        src: /usr/lib/wsl/lib/nvidia-smi
+        dest: /usr/local/bin/nvidia-smi
+        state: link
+        force: true
+    # --- usermod groups (как у тебя) + рестарт только если изменения
+
+    - name: "Ollama | check if user ollama exists"
+      ansible.builtin.command: id -u ollama
+      register: ollama_user_exists
+      changed_when: false
+      failed_when: false
+
+    - name: "Ollama | ensure ollama in video group (usermod -aG video ollama)"
+      become: true
+      ansible.builtin.shell: |
+        set -e
+        if id -nG ollama | tr ' ' '\n' | grep -qx video; then
+          echo "already"
+        else
+          usermod -aG video ollama
+          echo "changed"
+        fi
+      args:
+        executable: /bin/bash
+      register: ollama_video_group
+      changed_when: "'changed' in ollama_video_group.stdout"
+      when: ollama_user_exists.rc == 0
+
+    - name: "Ollama | ensure ollama in render group (usermod -aG render ollama)"
+      become: true
+      ansible.builtin.shell: |
+        set -e
+        if id -nG ollama | tr ' ' '\n' | grep -qx render; then
+          echo "already"
+        else
+          usermod -aG render ollama
+          echo "changed"
+        fi
+      args:
+        executable: /bin/bash
+      register: ollama_render_group
+      changed_when: "'changed' in ollama_render_group.stdout"
+      when: ollama_user_exists.rc == 0
+
+    - name: "Ollama | mark restart needed if groups changed"
+      ansible.builtin.set_fact:
+        ollama_restart_needed: >-
+          {{ ollama_restart_needed
+             or (ollama_video_group is changed)
+             or (ollama_render_group is changed) }}
+      changed_when: false
+      when: ollama_user_exists.rc == 0
+
+    - name: "Ollama | restart service ONLY if changes"
+      become: true
+      ansible.builtin.systemd:
+        name: ollama
+        state: restarted
+      when:
+        - ollama_user_exists.rc == 0
+        - ollama_restart_needed | bool
+
+    # --- логи (как ты просил)
+
+    - name: "Logs | journalctl grep cuda/nvidia (last 1 minute)"
+      become: true
+      ansible.builtin.shell: |
+        journalctl -u ollama --since "1 minute ago" --no-pager | grep -iE "cuda|nvidia" || true
+      args:
+        executable: /bin/bash
+      register: ollama_gpu_logs
+      changed_when: false
+
+    - name: "Logs | show matches"
+      ansible.builtin.debug:
+        var: ollama_gpu_logs.stdout_lines

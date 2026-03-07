@@ -3,9 +3,9 @@
     update_cache: true
     cache_valid_time: 3600
 
-- name: Upgrade packages
-  ansible.builtin.apt:
-    upgrade: dist
+#- name: Upgrade packages #maybe problems with upgrade
+ # ansible.builtin.apt:
+   # upgrade: dist
 
 - name: Install base packages
   ansible.builtin.apt:

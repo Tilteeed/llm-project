@@ -1,3 +1,18 @@
-llm_stack_dir: /opt/stack/llm
-monitoring_stack_dir: /opt/stack/monitoring
-gpu_enabled: false #false for VM(Vbox,VMWare...)
+#llm_stack_dir: /opt/stack/llm
+#monitoring_stack_dir: /opt/stack/monitoring
+#gpu_enabled: false #false for VM(Vbox,VMWare...)
+---
+wsl_gpu_missing_action: "fail"   # "fail" или "skip"
+
+wsl_cuda_visible_devices: "0"
+wsl_write_bashrc_exports: true
+wsl_add_wsl_lib_path: true
+wsl_install_cuda_toolkit: true
+
+# systemd override (если хочешь оставить опциональным)
+wsl_apply_ollama_override_if_no_gpu: false
+
+#ollama models
+ollama_test_model: "smollm:135m"
+ollama_test_prompt: "Say only: OK"
+ollama_test_enabled: true

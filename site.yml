@@ -3,7 +3,9 @@
   become: true
   roles:
     - { role: common, tags: ["common"] }
-    - { role: docker, tags: ["docker"] }
-    - { role: gpu, tags: ["gpu"] }
-    - { role: llm, tags: ["llm"] }
-    - { role: monitoring, tags: ["monitoring"] }
+#    - { role: docker, tags: ["docker"] }
+#    - { role: gpu, tags: ["gpu"] }
+#    - { role: llm, tags: ["llm"] }
+#    - { role: monitoring, tags: ["monitoring"] }
+    - { role: wsl_gpu, tags: ["wsl"] }
+    - { role: pull_models, tags: ["pull"] }

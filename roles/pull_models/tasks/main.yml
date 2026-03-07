@@ -1,0 +1,50 @@
+---
+- name: "Pull model | test block"
+  when: (ollama_test_enabled | default(true)) | bool
+  block:
+
+    - name: "Test | wait for Ollama API"
+      ansible.builtin.wait_for:
+        host: 127.0.0.1
+        port: 11434
+        timeout: 30
+      changed_when: false
+
+    - name: "Test | list installed models"
+      ansible.builtin.command: ollama list
+      register: ollama_list
+      changed_when: false
+      environment:
+        OLLAMA_HOST: "127.0.0.1:11434"
+
+    - name: "Test | set fact model_present"
+      ansible.builtin.set_fact:
+        ollama_model_present: >-
+          {{
+            (ollama_list.stdout | regex_search('^' ~ (ollama_test_model | default('smollm:135m')) ~ '\\s', multiline=True))
+            is not none
+          }}
+      changed_when: false
+
+    - name: "Test | pull small model if missing"
+      ansible.builtin.command: "ollama pull {{ ollama_test_model | default('smollm:135m') }}"
+      register: ollama_pull
+      when: not ollama_model_present
+      # changed только когда реально тянули (очень приблизительно, но лучше чем всегда true)
+      changed_when: not ollama_model_present
+      environment:
+        OLLAMA_HOST: "127.0.0.1:11434"
+
+    - name: "Test | run one short prompt (triggers inference)"
+      ansible.builtin.command:
+        argv:
+          - timeout
+          - "120"
+          - ollama
+          - run
+          - "{{ ollama_test_model | default('smollm:135m') }}"
+          - "{{ ollama_test_prompt | default('Say only: OK') }}"
+      register: ollama_test_run
+      changed_when: false
+      environment:
+        OLLAMA_HOST: "127.0.0.1:11434"
